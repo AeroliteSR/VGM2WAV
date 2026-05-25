@@ -23,53 +23,18 @@ def collect_all_binka_files(paths):
 
 def executeFiles(exe_path, binka_files):
     for file in binka_files:
-        command = [str(exe_path), str(file)]
-
+        command = [str(exe_path), str(file), '-o', str(file.with_suffix(".wav"))]
         print(subprocess.list2cmdline(command))
 
         try:
             subprocess.run(command, check=True)
+            file.unlink()
+            print(f"Converted: {file}")
         except subprocess.CalledProcessError as e:
-            print(f"Failed: {file}")
+            print(f"Conversion failed: {file}")
             print(e)
-
-def deleteFiles(binka_files):
-    for file in binka_files:
-        wav_file = file.with_suffix(file.suffix + ".wav")
-
-        if wav_file.exists():
-            try:
-                file.unlink()
-                print(f"Deleted: {file}")
-            except Exception as e:
-                print(f"Error deleting {file}: {e}")
-        else:
-            print(f"Skipping delete (no output): {file}")
-
-def get_converted_wav_files(binka_files):
-    wav_files = []
-    for file in binka_files:
-        wav_file = file.with_suffix(file.suffix + ".wav")
-
-        if wav_file.exists():
-            wav_files.append(wav_file)
-    return wav_files
-
-def renameFiles(wav_files):
-    for file_path in wav_files:
-        if file_path.name.lower().endswith(".binka.wav"):
-            new_name = file_path.name.replace(".binka", "")
-            new_path = file_path.with_name(new_name)
-
-            if new_path.exists():
-                print(f"Skipping rename, exists: {new_path}")
-                continue
-
-            try:
-                file_path.rename(new_path)
-                print(f"Renamed: {file_path} -> {new_path}")
-            except Exception as e:
-                print(f"Error renaming {file_path}: {e}")
+        except Exception as e:
+            print(f"Error processing {file}: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -89,8 +54,6 @@ if __name__ == "__main__":
     if binka_files:
         print(f"Found {len(binka_files)} .binka files.")
         executeFiles(exe_path, binka_files)
-        deleteFiles(binka_files)
-        renameFiles(get_converted_wav_files(binka_files))
 
     else:
         print("No .binka files found.")
