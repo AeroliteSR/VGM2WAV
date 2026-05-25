@@ -1,58 +1,45 @@
-import os
 import subprocess
 from pathlib import Path
 import sys
 
-def get_binka_files_from_path(path):
-    binka_files = []
+MAX_ARGS_LENGTH = 30000
 
-    if os.path.isfile(path) and path.lower().endswith(".binka"):
+def get_binka_files_from_path(path):
+    path = Path(path)
+
+    if path.is_file() and path.suffix.lower() == ".binka":
         return [path]
 
-    if os.path.isdir(path):
-        for root, _, files in os.walk(path):
-            for file in files:
-                if file.lower().endswith(".binka"):
-                    binka_files.append(os.path.join(root, file))
+    if path.is_dir():
+        return list(path.rglob("*.binka"))
 
-    return binka_files
+    return []
 
 def collect_all_binka_files(paths):
-    all_files = []
+    files = []
     for path in paths:
-        all_files.extend(get_binka_files_from_path(path))
-    return all_files
+        files.extend(get_binka_files_from_path(path))
+    return files
 
 def executeFiles(exe_path, binka_files):
-    MAX_ARGS_LENGTH = 32000
-    chunk = []
-    total_length = len(str(exe_path))
-
     for file in binka_files:
-        file_length = len(file) + 1
+        command = [str(exe_path), str(file)]
 
-        if total_length + file_length > MAX_ARGS_LENGTH:
-            command = [str(exe_path)] + chunk
-            print(f"Running: {' '.join(command)}")
+        print(subprocess.list2cmdline(command))
+
+        try:
             subprocess.run(command, check=True)
-
-            chunk = [file]
-            total_length = len(str(exe_path)) + len(file)
-        else:
-            chunk.append(file)
-            total_length += file_length
-
-    if chunk:
-        command = [str(exe_path)] + chunk
-        print(f"Running: {' '.join(command)}")
-        subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed: {file}")
+            print(e)
 
 def deleteFiles(binka_files):
     for file in binka_files:
-        wav_file = file + ".wav"
-        if os.path.exists(wav_file):
+        wav_file = file.with_suffix(file.suffix + ".wav")
+
+        if wav_file.exists():
             try:
-                os.remove(file)
+                file.unlink()
                 print(f"Deleted: {file}")
             except Exception as e:
                 print(f"Error deleting {file}: {e}")
@@ -62,19 +49,24 @@ def deleteFiles(binka_files):
 def get_converted_wav_files(binka_files):
     wav_files = []
     for file in binka_files:
-        wav_file = file + ".wav"
-        if os.path.exists(wav_file):
+        wav_file = file.with_suffix(file.suffix + ".wav")
+
+        if wav_file.exists():
             wav_files.append(wav_file)
     return wav_files
 
 def renameFiles(wav_files):
     for file_path in wav_files:
-        if file_path.lower().endswith(".binka.wav"):
-            dir_name = os.path.dirname(file_path)
-            new_name = os.path.basename(file_path).replace(".binka", "")
-            new_path = os.path.join(dir_name, new_name)
+        if file_path.name.lower().endswith(".binka.wav"):
+            new_name = file_path.name.replace(".binka", "")
+            new_path = file_path.with_name(new_name)
+
+            if new_path.exists():
+                print(f"Skipping rename, exists: {new_path}")
+                continue
+
             try:
-                os.rename(file_path, new_path)
+                file_path.rename(new_path)
                 print(f"Renamed: {file_path} -> {new_path}")
             except Exception as e:
                 print(f"Error renaming {file_path}: {e}")
@@ -86,7 +78,11 @@ if __name__ == "__main__":
         sys.exit()
 
     input_paths = sys.argv[1:]
-    exe_path = Path(getattr(sys, "_MEIPASS", ".")) / "vgmstream" / "vgmstream-cli.exe"
+
+    exe_path = (
+        Path(getattr(sys, "_MEIPASS", "."))
+        / "vgmstream"
+        / "vgmstream-cli.exe")
 
     binka_files = collect_all_binka_files(input_paths)
 
@@ -95,6 +91,7 @@ if __name__ == "__main__":
         executeFiles(exe_path, binka_files)
         deleteFiles(binka_files)
         renameFiles(get_converted_wav_files(binka_files))
+
     else:
         print("No .binka files found.")
 
