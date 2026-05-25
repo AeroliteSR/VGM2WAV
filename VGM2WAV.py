@@ -2,16 +2,26 @@ import subprocess
 from pathlib import Path
 import sys
 
-MAX_ARGS_LENGTH = 30000
+filetypes = [
+    ".binka",
+    ".wem",
+    ".awb",
+    ".fsb"]
 
 def get_binka_files_from_path(path):
     path = Path(path)
 
-    if path.is_file() and path.suffix.lower() == ".binka":
+    if path.is_file() and path.suffix.lower() in filetypes:
         return [path]
 
     if path.is_dir():
-        return list(path.rglob("*.binka"))
+        lst = []
+        for t in filetypes:
+            c = list(path.rglob(f"*{t}"))
+            print(f"Found {len(c)} {t} files in {path}")
+            lst.extend(c)
+
+        return lst
 
     return []
 
@@ -52,11 +62,10 @@ if __name__ == "__main__":
     binka_files = collect_all_binka_files(input_paths)
 
     if binka_files:
-        print(f"Found {len(binka_files)} .binka files.")
         executeFiles(exe_path, binka_files)
 
     else:
-        print("No .binka files found.")
+        print("No supported files found.")
 
     input("Done! Press Enter to exit...")
-# pyinstaller --onefile --add-data "vgmstream;vgmstream" Binka2WAV.py
+# pyinstaller --onefile --add-data "vgmstream;vgmstream" VGM2WAV.py
